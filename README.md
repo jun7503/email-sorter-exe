@@ -23,4 +23,4 @@ A fully offline, append-only email classification and summary tool.
 
 ## Build (GitHub)
 
-Tag a release:v1.0.3
+Tag a release:v1.0.5
