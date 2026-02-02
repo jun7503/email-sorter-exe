@@ -1,0 +1,1 @@
+# Full PyInstaller spec placeholder
