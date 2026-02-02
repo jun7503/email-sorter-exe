@@ -26,8 +26,8 @@ jobs:
           key: ${{ runner.os }}-pip-${{ hashFiles('build/requirements_frozen.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
-    
-        - name: Print repo tree
+            
+      - name: Print repo tree
         run: |
           echo "PWD:"
           pwd
