@@ -49,12 +49,6 @@ jobs:
           echo "=== Python Version ==="
           python --version
 
-          echo "=== Installed packages ==="
-          python - <<EOF
-          import pkgutil
-          print([m.name for m in pkgutil.iter_modules()])
-          EOF
-
       - name: Build EXE with PyInstaller
         run: |
           echo "=== Starting PyInstaller build ==="
@@ -81,3 +75,4 @@ jobs:
             dist/EmailSorter.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+``
