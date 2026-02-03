@@ -2,7 +2,7 @@
 
 from pathlib import Path
 import sys
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_submodules, collect_all
 
 block_cipher = None
 
@@ -19,20 +19,19 @@ except NameError:
 REPO_ROOT = SPEC_DIR if SPEC_DIR.name.lower() != "build" else SPEC_DIR.parent
 if not (REPO_ROOT / "src").exists():
     # Last-ditch fallback for the Actions double-folder checkout pattern
-    # If we accidentally ended up at D:\a\repo instead of D:\a\repo\repo
-    # and the inner folder exists, use it.
     inner = REPO_ROOT / REPO_ROOT.name
     if (inner / "src").exists():
         REPO_ROOT = inner
 
 SRC_DIR = REPO_ROOT / "src"
 CONFIG_FILE = REPO_ROOT / "config" / "config_default.json"
+HOOKS_DIR = REPO_ROOT / "hooks"   # <— NEW: where hook-email_sorter.py lives
 
 # ✅ Add src/ to sys.path so collect_submodules("email_sorter") works at spec-parse time
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-# === DEBUG INFO (one-time; safe to keep or remove later) ===
+# === DEBUG INFO (keep for now; appears in Actions logs) ===
 print(">> REPO_ROOT:", REPO_ROOT)
 print(">> SRC_DIR:", SRC_DIR)
 _collected_email_sorter = collect_submodules("email_sorter")
@@ -41,22 +40,27 @@ for _m in sorted(_collected_email_sorter):
     print("   -", _m)
 # === END DEBUG INFO ===
 
-datas = [
-    (str(CONFIG_FILE), "config"),
-]
-
-# --- Collect hidden imports ---
+# ---- Data files bundled next to the exe (inside dist/EmailSorter/) ----
+datas = [(str(CONFIG_FILE), "config")]
+binaries = []
 hiddenimports = set()
 
-# 외부 패키지 서브모듈 수집 (기존 유지)
+# 1) External package submodules (keep)
 hiddenimports.update(collect_submodules("extract_msg"))
 
-# 우리 패키지 전체(자동 수집)
+# 2) Collect *everything* from our package (code + data) — very robust
+email_data, email_bins, email_hidden = collect_all("email_sorter")
+datas += email_data
+binaries += email_bins
+hiddenimports.update(email_hidden)
+
+# 3) Our package as discovered earlier
 hiddenimports.update(_collected_email_sorter)
 
-# 안전을 위해 '정확한 이름'도 직접 명시 (반드시 포함되게)
+# 4) Optional: explicit names (belt-and-suspenders)
 hiddenimports.update({
     "email_sorter",
+    "email_sorter.app",
     "email_sorter.gui",
     "email_sorter.config_loader",
     "email_sorter.utils",
@@ -64,7 +68,7 @@ hiddenimports.update({
     "email_sorter.text_clean",
     "email_sorter.clustering",
     "email_sorter.dedup",
-    "email_sorter.mail_parser",      # ← matches your current file
+    "email_sorter.mail_parser",
     "email_sorter.excel_writer",
     "email_sorter.issue_milestone",
     "email_sorter.keys",
@@ -73,18 +77,20 @@ hiddenimports.update({
 
 hiddenimports = list(hiddenimports)
 
+# ⚠️ IMPORTANT: resolve imports ONLY from src/ to avoid path shadowing
 a = Analysis(
-    [str(SRC_DIR / "run_email_sorter.py")],   # ← use the launcher
-    pathex=[str(SRC_DIR), str(REPO_ROOT)],    # include both src and repo root
-    binaries=[],
+    [str(SRC_DIR / "run_email_sorter.py")],   # entry launcher
+    pathex=[str(SRC_DIR)],                    # ← ONLY src (remove repo root)
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
-    hookspath=[],
+    hookspath=[str(HOOKS_DIR)] if HOOKS_DIR.exists() else [],  # <— NEW
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
     noarchive=False,
 )
+
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
@@ -101,7 +107,7 @@ exe = EXE(
     upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,    # set True once if you want to see logs in a console when the app starts
+    console=True,    # <— Turn ON for one run to see logs; set False later
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
