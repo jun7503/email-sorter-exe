@@ -45,7 +45,7 @@ hiddenimports = list(hiddenimports)
 
 a = Analysis(
     [str(SRC_DIR / "app.py")],
-    pathex=[str(SRC_DIR)],
+    pathex=[str(SRC_DIR), str(REPO_ROOT)],  # include both src and repo root
     binaries=[],
     datas=datas,
     hiddenimports=hiddenimports,
@@ -55,7 +55,6 @@ a = Analysis(
     excludes=[],
     noarchive=False,
 )
-
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
@@ -72,7 +71,7 @@ exe = EXE(
     upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,
+    console=true,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
