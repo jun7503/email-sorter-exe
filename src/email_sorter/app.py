@@ -48,6 +48,19 @@ def main():
         cfg = load_config()
         logging.getLogger().info("Configuration loaded successfully")
 
+        # Start GUI
         app = QApplication([])
         window = EmailSorterWindow(cfg)
+        window.show()
 
+        logging.getLogger().info("GUI created successfully")
+
+        app.exec()
+
+    except Exception as e:
+        logging.getLogger().exception("Unhandled error in main()")
+        raise
+
+
+if __name__ == "__main__":
+    main()
