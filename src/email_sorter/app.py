@@ -1,6 +1,7 @@
+# src/email_sorter/app.py
 from PySide6.QtWidgets import QApplication
-from email_sorter.gui import EmailSorterWindow
-from email_sorter.config_loader import load_config
+from .gui import EmailSorterWindow        # ← relative import
+from .config_loader import load_config    # ← relative import
 
 def main():
     cfg = load_config()
