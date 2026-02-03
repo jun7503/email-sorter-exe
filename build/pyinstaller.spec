@@ -32,19 +32,18 @@ datas = [
     (str(CONFIG_FILE), "config"),
 ]
 
-# Keep hidden imports from extract_msg, and also include all local .py modules in src
-hiddenimports = set(collect_submodules("extract_msg"))
+# --- Collect hidden imports ---
+# Include external library submodules we use
+hiddenimports = set()
+hiddenimports.update(collect_submodules("extract_msg"))
 
-# Add every .py file (except app.py) in src as hidden imports (e.g., gui, utils, etc.)
-for p in SRC_DIR.glob("*.py"):
-    name = p.stem
-    if name != "app":
-        hiddenimports.add(name)
+# Include our whole local package: email_sorter (so email_sorter.gui, utils, etc. are bundled)
+hiddenimports.update(collect_submodules("email_sorter"))
 
 hiddenimports = list(hiddenimports)
 
 a = Analysis(
-    [str(SRC_DIR / "email_sorter" / "app.py")],  # ← MUST be the package path now
+    [str(SRC_DIR / "run_email_sorter.py")],   # ← use the launcher
     pathex=[str(SRC_DIR), str(REPO_ROOT)],  # include both src and repo root
     binaries=[],
     datas=datas,
