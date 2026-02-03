@@ -9,7 +9,7 @@ def _safe(x):
     return x or ""
 
 def parse_eml(path: str):
-    """Parse .eml file"""
+    """Parse a .eml file and extract metadata and body content."""
     with open(path, "rb") as f:
         msg = BytesParser(policy=policy.default).parse(f)
 
@@ -27,18 +27,22 @@ def parse_eml(path: str):
         received = _safe(date_raw)
 
     body = extract_text_body(msg)
+
     return {
         "MessageID": message_id,
         "Subject": subject,
-        "From": sender, "To": to, "Cc": cc,
+        "From": sender,
+        "To": to,
+        "Cc": cc,
         "Sender": sender,
         "Received": received,
         "Body": body
     }
 
 def extract_text_body(msg):
-    """Extract plain text content, fallback to HTML."""
+    """Extract the plain text body, falling back to HTML content if needed."""
     if msg.is_multipart():
+        # Prefer plain text
         for part in msg.walk():
             if part.get_content_type() == "text/plain" and (part.get_content_disposition() or "") != "attachment":
                 try:
@@ -46,6 +50,7 @@ def extract_text_body(msg):
                 except Exception:
                     pass
 
+        # Fallback to HTML
         for part in msg.walk():
             if part.get_content_type() == "text/html":
                 try:
@@ -67,24 +72,24 @@ def extract_text_body(msg):
             return ""
 
 def html_to_text(html):
-    """Basic HTML → text converter"""
+    """Basic HTML-to-text converter."""
     import re
-    t = re.sub(r"<(script|style)[\\s\\S]*?</\\1>", "", html, flags=re.I)
-    t = re.sub(r"<br\\s*/?>", "\\n", t, flags=re.I)
-    t = re.sub(r"</p>", "\\n", t, flags=re.I)
+    t = re.sub(r"<(script|style)[\s\S]*?</\1>", "", html, flags=re.I)
+    t = re.sub(r"<br\s*/?>", "\n", t, flags=re.I)
+    t = re.sub(r"</p>", "\n", t, flags=re.I)
     t = re.sub(r"<[^>]+>", "", t)
     return t.replace("&nbsp;", " ")
 
 def parse_msg(path: str):
-    """Parse Outlook .msg"""
+    """Parse an Outlook .msg file and extract metadata and body content."""
     msg = extract_msg.Message(path)
 
-    subject  = _safe(msg.subject)
-    sender   = _safe(msg.sender)
-    to       = _safe(msg.to)
-    cc       = _safe(msg.cc)
-    message_id = _safe(msg.headerDict.get("Message-ID", "")).strip()
-    received   = _safe(str(msg.date))
+    subject     = _safe(msg.subject)
+    sender      = _safe(msg.sender)
+    to          = _safe(msg.to)
+    cc          = _safe(msg.cc)
+    message_id  = _safe(msg.headerDict.get("Message-ID", "")).strip()
+    received    = _safe(str(msg.date))
 
     try:
         body = msg.body or ""
@@ -94,16 +99,20 @@ def parse_msg(path: str):
     return {
         "MessageID": message_id,
         "Subject": subject,
-        "From": sender, "To": to, "Cc": cc,
+        "From": sender,
+        "To": to,
+        "Cc": cc,
         "Sender": sender,
         "Received": received,
         "Body": body
     }
 
 def parse_email_file(path: str):
+    """Dispatch to the appropriate parser based on file extension."""
     ext = os.path.splitext(path)[1].lower()
     if ext == ".eml":
         return parse_eml(path)
     if ext == ".msg":
         return parse_msg(path)
     raise ValueError(f"Unsupported file type: {ext}")
+``
