@@ -23,7 +23,7 @@ class EmailSorterWindow(QWidget):
     def __init__(self, cfg: dict):
         super().__init__()
         self.cfg = cfg
-        self.setWindowTitle(f\"📬 EmailSorter v{__version__}\")
+        self.setWindowTitle(f\"📬 EmailSorter v{__version__}")
         self.setMinimumSize(720, 520)
         self.setAcceptDrops(True)
 
