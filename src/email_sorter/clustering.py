@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from __future__ import annotations
+
 import pickle
 from pathlib import Path
 from typing import Dict, Any
@@ -6,6 +8,7 @@ from typing import Dict, Any
 from sklearn.feature_extraction.text import HashingVectorizer
 from sklearn.cluster import MiniBatchKMeans
 import scipy.sparse as sp
+
 
 class DomainClusterer:
     """
