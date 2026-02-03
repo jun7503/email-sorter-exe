@@ -33,12 +33,32 @@ datas = [
 ]
 
 # --- Collect hidden imports ---
-# Include external library submodules we use
+from PyInstaller.utils.hooks import collect_submodules
+
 hiddenimports = set()
+
+# 외부 패키지 서브모듈 수집 (기존 유지)
 hiddenimports.update(collect_submodules("extract_msg"))
 
-# Include our whole local package: email_sorter (so email_sorter.gui, utils, etc. are bundled)
+# 우리 패키지 전체(자동 수집)
 hiddenimports.update(collect_submodules("email_sorter"))
+
+# 안전을 위해 '정확한 이름'도 직접 명시 (반드시 포함되게)
+hiddenimports.update({
+    "email_sorter",
+    "email_sorter.gui",
+    "email_sorter.config_loader",
+    "email_sorter.utils",
+    "email_sorter.summary",
+    "email_sorter.text_clean",
+    "email_sorter.clustering",
+    "email_sorter.dedup",
+    "email_sorter.email_parser",
+    "email_sorter.excel_writer",
+    "email_sorter.issue_milestone",
+    "email_sorter.keys",
+    "email_sorter.topic_map",
+})
 
 hiddenimports = list(hiddenimports)
 
