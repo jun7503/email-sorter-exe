@@ -44,7 +44,7 @@ for p in SRC_DIR.glob("*.py"):
 hiddenimports = list(hiddenimports)
 
 a = Analysis(
-    [str(SRC_DIR / "app.py")],
+    [str(SRC_DIR / "email_sorter" / "app.py")],  # ← MUST be the package path now
     pathex=[str(SRC_DIR), str(REPO_ROOT)],  # include both src and repo root
     binaries=[],
     datas=datas,
