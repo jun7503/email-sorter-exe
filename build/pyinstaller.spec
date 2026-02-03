@@ -32,7 +32,16 @@ datas = [
     (str(CONFIG_FILE), "config"),
 ]
 
-hiddenimports = collect_submodules("extract_msg")
+# Keep hidden imports from extract_msg, and also include all local .py modules in src
+hiddenimports = set(collect_submodules("extract_msg"))
+
+# Add every .py file (except app.py) in src as hidden imports (e.g., gui, utils, etc.)
+for p in SRC_DIR.glob("*.py"):
+    name = p.stem
+    if name != "app":
+        hiddenimports.add(name)
+
+hiddenimports = list(hiddenimports)
 
 a = Analysis(
     [str(SRC_DIR / "app.py")],
