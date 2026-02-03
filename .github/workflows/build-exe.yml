@@ -27,7 +27,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # Debug: print folder structure
       - name: Print repo tree
         run: |
           echo "PWD:"
@@ -56,14 +55,12 @@ import pkgutil
 print([m.name for m in pkgutil.iter_modules()])
 EOF
 
-      # Build EXE with full log capture
       - name: Build EXE with PyInstaller
         run: |
           echo "=== Starting PyInstaller build ==="
           pyinstaller build/pyinstaller.spec --noconfirm --clean 2>&1 | tee build_log.txt
           echo "=== PyInstaller build finished ==="
 
-      # Upload the build log for debugging if needed
       - name: Upload Build Log
         uses: actions/upload-artifact@v4
         with:
