@@ -49,4 +49,3 @@ def resource_path(relative_path: str) -> Path:
 def is_frozen() -> bool:
     """True if running as a PyInstaller-frozen executable."""
     return bool(getattr(sys, "frozen", False))
-``
