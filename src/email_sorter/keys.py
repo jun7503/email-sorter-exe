@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
 import hashlib
-from text_clean import canonical_subject, sender_domain
+from .text_clean import canonical_subject, sender_domain
 
 def content_hash(meta: dict) -> str:
     """Compute a stable hash over key fields to detect exact duplicates when the Message-ID is missing."""
