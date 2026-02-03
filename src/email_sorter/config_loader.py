@@ -6,32 +6,55 @@ from pathlib import Path
 import sys
 
 
+def _project_root_from_this_file() -> Path:
+    """
+    This file lives at: <repo>/src/email_sorter/config_loader.py
+    parents[0] -> email_sorter
+    parents[1] -> src
+    parents[2] -> <repo root>   <-- we want this in dev
+    """
+    return Path(__file__).resolve().parents[2]
+
+
+def _bundle_base_dir() -> Path:
+    """
+    Return the base directory for bundled resources when running as a frozen app.
+    - In PyInstaller onefile, data is unpacked under sys._MEIPASS.
+    - In PyInstaller onedir, data is next to the EXE (sys.executable.parent).
+    """
+    if hasattr(sys, "_MEIPASS"):
+        # onefile
+        return Path(sys._MEIPASS)  # type: ignore[attr-defined]
+    # onedir fallback (and some other frozen modes)
+    return Path(sys.executable).parent
+
+
+def resource_path(relative_path: str) -> Path:
+    """
+    Resolve a resource path that works both in dev and frozen builds.
+    """
+    if getattr(sys, "frozen", False):
+        base_dir = _bundle_base_dir()
+    else:
+        base_dir = _project_root_from_this_file()
+    return base_dir / relative_path
+
+
 def load_config() -> dict:
     """
-    Load config/config_default.json.
-
-    Works both when running from source (python src/run_email_sorter.py)
-    and when running as a PyInstaller-frozen executable.
+    Load config/config_default.json, working in both dev and PyInstaller builds.
     """
-    # Base directory: EXE dir when frozen; repo root when running from source.
-    if getattr(sys, "frozen", False):
-        base_dir = Path(sys.executable).parent
-    else:
-        # this file lives at src/email_sorter/config_loader.py
-        # repo root = src/.. (parent of src)
-        base_dir = Path(__file__).resolve().parent.parent
-
-    cfg_path = base_dir / "config" / "config_default.json"
+    cfg_path = resource_path("config/config_default.json")
 
     if not cfg_path.exists():
-        # Provide a clear error with the path we attempted
         raise FileNotFoundError(
-            f"Config file not found: {cfg_path}\n"
-            f"Current base_dir: {base_dir}\n"
-            f"Frozen: {getattr(sys, 'frozen', False)}"
+            "Config file not found: "
+            f"{cfg_path}\n"
+            f"Base dir used: {cfg_path.parent.parent}\n"
+            f"Frozen: {getattr(sys, 'frozen', False)} "
+            f"(MEIPASS: {getattr(sys, '_MEIPASS', None)})"
         )
 
-    with open(cfg_path, "r", encoding="utf-8") as f:
-        cfg = json.load(f)
-
-    return cfg
+    with cfg_path.open("r", encoding="utf-8") as f:
+        return json.load(f)
+``
