@@ -71,9 +71,9 @@ exe = EXE(
     upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True    # show a console window (useful for debugging)
+    console=True,    # show a console window (useful for debugging)
     # or
-    console=False   # hide console window (for final release)
+    console=False,   # hide console window (for final release)
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
