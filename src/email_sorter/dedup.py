@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
+from __future__ import annotations
+
 from typing import Optional
+
 
 class SimilarityDecider:
     """
@@ -13,13 +16,14 @@ class SimilarityDecider:
 
     @staticmethod
     def _token_set(text: str):
-        return set(t for t in (text or "").lower().split() if len(t) > 2)
+        return {t for t in (text or "").lower().split() if len(t) > 2}
 
     def similarity(self, a: str, b: str) -> float:
         A = self._token_set(a)
         B = self._token_set(b)
         if not A or not B:
             return 0.0
+        # Jaccard similarity
         return len(A & B) / float(len(A | B) + 1e-9)
 
     def is_version(self, new_text: str, prev_text: Optional[str]) -> bool:
