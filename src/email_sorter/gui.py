@@ -86,6 +86,58 @@ class EmailSorterWindow(QWidget):
         v.addWidget(self.progress)
 
     # ------------------------------------------------------------
+    # Drag & drop events
+    # ------------------------------------------------------------
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+        event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        from PySide6.QtCore import QUrl
+        import logging
+
+        urls = event.mimeData().urls()
+        if not urls:
+            logging.error("DropEvent: No URLs found.")
+            return
+
+        filepaths = []
+
+        for url in urls:
+            if isinstance(url, QUrl):
+                local_path = url.toLocalFile()
+            else:
+                continue
+
+            if not local_path:
+                continue
+
+            filepaths.append(local_path)
+
+    # Process each file
+    for path in filepaths:
+        logging.info(f"Dropped file: {path}")
+
+        ext = os.path.splitext(path)[1].lower()
+        if ext not in (".eml", ".msg"):
+            logging.warning(f"Skipped non-email file: {path}")
+            continue
+
+        try:
+            rec = parse_email_file(path)
+            logging.info(f"Parsed email successfully: subject={rec.get('Subject')}")
+
+            # Save processed record
+            self.processed_items.append(rec)
+
+        except Exception as e:
+            logging.exception(f"Failed to parse email: {path}")
+            QMessageBox.critical(self, "Error", f"Cannot parse {path}\n\n{str(e)}")
+
+    QMessageBox.information(self, "Done", f"Processed {len(filepaths)} email(s).")
+    # ------------------------------------------------------------
     # Excel output path selection
     # ------------------------------------------------------------
     def _choose_excel_path(self):
