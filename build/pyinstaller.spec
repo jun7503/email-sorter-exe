@@ -28,6 +28,11 @@ if not (REPO_ROOT / "src").exists():
 SRC_DIR = REPO_ROOT / "src"
 CONFIG_FILE = REPO_ROOT / "config" / "config_default.json"
 
+# ✅ Add src/ to sys.path so collect_submodules("email_sorter") works at spec-parse time
+import sys
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
 datas = [
     (str(CONFIG_FILE), "config"),
 ]
@@ -40,7 +45,7 @@ hiddenimports = set()
 # 외부 패키지 서브모듈 수집 (기존 유지)
 hiddenimports.update(collect_submodules("extract_msg"))
 
-# 우리 패키지 전체(자동 수집)
+# 우리 패키지 전체(자동 수집) — now it can actually be imported
 hiddenimports.update(collect_submodules("email_sorter"))
 
 # 안전을 위해 '정확한 이름'도 직접 명시 (반드시 포함되게)
@@ -64,7 +69,7 @@ hiddenimports = list(hiddenimports)
 
 a = Analysis(
     [str(SRC_DIR / "run_email_sorter.py")],   # ← use the launcher
-    pathex=[str(SRC_DIR), str(REPO_ROOT)],  # include both src and repo root
+    pathex=[str(SRC_DIR), str(REPO_ROOT)],    # include both src and repo root
     binaries=[],
     datas=datas,
     hiddenimports=hiddenimports,
@@ -90,7 +95,7 @@ exe = EXE(
     upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,    # show a console window (useful for debugging)
+    console=False,    # set True for one build if you want to see logs
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
