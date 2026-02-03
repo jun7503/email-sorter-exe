@@ -43,7 +43,64 @@ class EmailSorterWindow(QWidget):
 
     def _build_ui(self):
         v = QVBoxLayout(self)
+        def _build_ui(self):
+        v = QVBoxLayout(self)
 
+        title = QLabel("Drag & drop .eml / .msg files here")
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("font-size:18px; font-weight:bold;")
+        v.addWidget(title)
+
+        self.path_label = QLabel("Excel: (not chosen)")
+        v.addWidget(self.path_label)
+
+        row = QHBoxLayout()
+        # ... continue your existing UI code ...
+
+
+    # ==========================================
+    # ADD THIS METHOD RIGHT BELOW _build_ui()
+    # ==========================================
+    def _choose_excel_path(self):
+        """
+        Ask the user where to save the Excel file.
+        Called inside __init__.
+        """
+
+        mode = (self.cfg.get("excel_path_mode") or "").lower()
+
+        if mode == "ask_each_time":
+            path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Choose Excel Output File",
+                "EmailSorter_Output.xlsx",
+                "Excel Files (*.xlsx)",
+            )
+            if not path:
+                self.excel_path = None
+                self.path_label.setText("Excel: (not chosen)")
+                return
+
+            self.excel_path = path
+            self.path_label.setText(f"Excel: {path}")
+            return
+
+        # Fixed path mode
+        if mode == "fixed_path":
+            fixed = self.cfg.get("excel_output_path")
+            if fixed:
+                self.excel_path = fixed
+                self.path_label.setText(f"Excel: {fixed}")
+                return
+            else:
+                self.excel_path = None
+                self.path_label.setText("Excel: (fixed path missing)")
+                return
+
+        # Default
+        self.excel_path = None
+        self.path_label.setText("Excel: (not chosen)")
+        
         title = QLabel("Drag & drop .eml / .msg files here")
         title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet("font-size:18px; font-weight:bold;")
