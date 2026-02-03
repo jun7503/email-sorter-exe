@@ -58,7 +58,7 @@ hiddenimports.update({
     "email_sorter.text_clean",
     "email_sorter.clustering",
     "email_sorter.dedup",
-    "email_sorter.email_parser",
+    "email_sorter.mail_parser",
     "email_sorter.excel_writer",
     "email_sorter.issue_milestone",
     "email_sorter.keys",
