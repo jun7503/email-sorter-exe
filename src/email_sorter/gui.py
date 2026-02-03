@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 
-# 🔁 Use relative imports inside the package
+# 🔁 Relative imports inside the package
 from .mail_parser import parse_email_file
 from .text_clean import clean_body_for_semantics, canonical_subject, sender_domain
 from .keys import message_key, thread_key, update_group_key, content_hash
@@ -41,13 +41,13 @@ class EmailSorterWindow(QWidget):
         self.clusterer = DomainClusterer(cfg)
         self.index_keys: set[str] = set()
         self.topic_map = TopicMap()
-        self.processed_items = []    # fill this after processing
+        self.processed_items = []    # collected parsed emails
         self.excel_path: str | None = None
 
-        # Build UI (buttons, labels)
+        # Build UI
         self._build_ui()
 
-        # Choose Excel output location at startup (depending on config)
+        # Select Excel output location
         self._choose_excel_path()
 
     # ------------------------------------------------------------
@@ -61,36 +61,36 @@ class EmailSorterWindow(QWidget):
         title.setStyleSheet("font-size:18px; font-weight:bold;")
         v.addWidget(title)
 
-        # Path display
+        # Excel path display
         self.path_label = QLabel("Excel: (not chosen)")
         v.addWidget(self.path_label)
 
         row = QHBoxLayout()
 
-        # Change Excel Path button
+        # Change output path
         self.btn_change_path = QPushButton("Change Excel Path")
         self.btn_change_path.clicked.connect(self._choose_excel_path)
         row.addWidget(self.btn_change_path)
 
-        # Save Excel button
+        # Save Excel
         self.btn_save_excel = QPushButton("Save Excel")
         self.btn_save_excel.clicked.connect(self._on_save_excel_clicked)
         row.addWidget(self.btn_save_excel)
 
         v.addLayout(row)
 
-        # Progress bar (indeterminate mode)
+        # Progress bar
         self.progress = QProgressBar()
         self.progress.setRange(0, 0)
         self.progress.setVisible(False)
         v.addWidget(self.progress)
 
     # ------------------------------------------------------------
-    # Drag & drop events
+    # Drag & drop events (fully fixed)
     # ------------------------------------------------------------
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
-        event.acceptProposedAction()
+            event.acceptProposedAction()
         else:
             event.ignore()
 
@@ -105,49 +105,50 @@ class EmailSorterWindow(QWidget):
 
         filepaths = []
 
+        # Convert QUrl to local file paths
         for url in urls:
-            if isinstance(url, QUrl):
-                local_path = url.toLocalFile()
-            else:
+            local_path = url.toLocalFile()
+            if local_path:
+                filepaths.append(local_path)
+                logging.info(f"DropEvent: Received file = {local_path}")
+
+        if not filepaths:
+            QMessageBox.warning(self, "No files", "No valid files dropped.")
+            return
+
+        # Process each file
+        for path in filepaths:
+            ext = os.path.splitext(path)[1].lower()
+
+            if ext not in (".eml", ".msg"):
+                logging.warning(f"Skipped non-email file: {path}")
                 continue
 
-            if not local_path:
-                continue
+            try:
+                rec = parse_email_file(path)
+                logging.info(
+                    f"Parsed successfully: subject={rec.get('Subject')}"
+                )
+                self.processed_items.append(rec)
 
-            filepaths.append(local_path)
+            except Exception as e:
+                logging.exception(f"Failed parsing file: {path}")
+                QMessageBox.critical(
+                    self,
+                    "Error",
+                    f"Cannot parse:\n{path}\n\n{str(e)}"
+                )
 
-    # Process each file
-    for path in filepaths:
-        logging.info(f"Dropped file: {path}")
+        QMessageBox.information(
+            self,
+            "Done",
+            f"Processed {len(filepaths)} email(s)."
+        )
 
-        ext = os.path.splitext(path)[1].lower()
-        if ext not in (".eml", ".msg"):
-            logging.warning(f"Skipped non-email file: {path}")
-            continue
-
-        try:
-            rec = parse_email_file(path)
-            logging.info(f"Parsed email successfully: subject={rec.get('Subject')}")
-
-            # Save processed record
-            self.processed_items.append(rec)
-
-        except Exception as e:
-            logging.exception(f"Failed to parse email: {path}")
-            QMessageBox.critical(self, "Error", f"Cannot parse {path}\n\n{str(e)}")
-
-    QMessageBox.information(self, "Done", f"Processed {len(filepaths)} email(s).")
     # ------------------------------------------------------------
     # Excel output path selection
     # ------------------------------------------------------------
     def _choose_excel_path(self):
-        """
-        Ask the user where to save the Excel output file.
-        Works in both config modes:
-          - ask_each_time
-          - fixed_path
-        """
-
         mode = (self.cfg.get("excel_path_mode") or "").lower()
 
         # Ask user every time
@@ -179,7 +180,7 @@ class EmailSorterWindow(QWidget):
             self.path_label.setText("Excel: (fixed path missing)")
             return
 
-        # Default fallback
+        # Default
         self.excel_path = None
         self.path_label.setText("Excel: (not chosen)")
 
@@ -187,15 +188,9 @@ class EmailSorterWindow(QWidget):
     # Save Excel Handler
     # ------------------------------------------------------------
     def _on_save_excel_clicked(self):
-        """
-        Save the Excel file using ExcelStore.
-        If the path is missing and config says ask_each_time,
-        prompt the user again.
-        """
         try:
             mode = (self.cfg.get("excel_path_mode") or "").lower()
 
-            # Ask user again if needed
             if mode == "ask_each_time":
                 path, _ = QFileDialog.getSaveFileName(
                     self,
@@ -207,13 +202,11 @@ class EmailSorterWindow(QWidget):
                     return
                 self.excel_path = path
 
-            # If no path yet → choose one
             if not self.excel_path:
                 self._choose_excel_path()
                 if not self.excel_path:
                     return
 
-            # Ensure folder exists
             p = Path(self.excel_path)
             p.parent.mkdir(parents=True, exist_ok=True)
 
@@ -221,12 +214,12 @@ class EmailSorterWindow(QWidget):
             self.progress.setVisible(True)
             self.btn_save_excel.setEnabled(False)
 
-            # Save the file
             self._save_excel_to(self.excel_path)
 
             self.path_label.setText(f"Excel: {self.excel_path}")
             QMessageBox.information(
-                self, "Success",
+                self,
+                "Success",
                 f"Excel saved successfully:\n{self.excel_path}"
             )
 
@@ -234,34 +227,20 @@ class EmailSorterWindow(QWidget):
             QMessageBox.critical(self, "Save failed", str(e))
 
         finally:
-            self.progress.setVisible(False)
+               self.progress.setVisible(False)
             self.btn_save_excel.setEnabled(True)
 
     # ------------------------------------------------------------
-    # Core Excel Writing Logic
+    # Excel Writing Logic
     # ------------------------------------------------------------
     def _save_excel_to(self, path: str | os.PathLike):
-        """
-        Actually writes to Excel file using ExcelStore.
-        Modify this based on your ExcelStore implementation.
-        """
-
-        # Example content — replace with real processed items
         rows = self.processed_items
 
-        # Simple ExcelStore pattern (you can customize this)
         store = ExcelStore(path)
         try:
-            # Example: write items
-            # Replace with your actual ExcelStore API
             if hasattr(store, "write_rows"):
                 store.write_rows("Emails", rows)
 
-            # Add more sheets as needed
-            # store.write_summary(...)
-            # store.write_topics(...)
-
-            # If your class uses save():
             if hasattr(store, "save"):
                 store.save()
 
