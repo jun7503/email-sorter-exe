@@ -1,4 +1,4 @@
-# PyInstaller spec for EmailSorter (windowed, onefile)
+# build/pyinstaller.spec
 
 import os
 from pathlib import Path
@@ -6,60 +6,68 @@ from PyInstaller.utils.hooks import collect_submodules
 
 block_cipher = None
 
-# --- Paths robust to PyInstaller's execution model ---
-# PyInstaller runs with CWD = directory containing this spec file.
-SPEC_DIR = Path.cwd()                 # .../<repo_root>/build
-REPO_ROOT = SPEC_DIR.parent           # .../<repo_root>
+# --- Robust path detection regardless of where pyinstaller is invoked ---
+try:
+    # Works when __file__ is defined (most local runs, many CI contexts)
+    SPEC_DIR = Path(__file__).resolve().parent
+except NameError:
+    # Fallback: derive from current working directory if __file__ is not set
+    SPEC_DIR = Path.cwd() / "build" if (Path.cwd() / "build" / "pyinstaller.spec").exists() else Path.cwd()
+
+# In your repo the spec lives at <repo_root>/build/pyinstaller.spec
+# If SPEC_DIR points to .../build, parent is the repo root.
+REPO_ROOT = SPEC_DIR if SPEC_DIR.name.lower() != "build" else SPEC_DIR.parent
+if not (REPO_ROOT / "src").exists():
+    # Last-ditch fallback for the Actions double-folder checkout pattern
+    # If we accidentally ended up at D:\a\repo instead of D:\a\repo\repo
+    # and the inner folder exists, use it.
+    inner = REPO_ROOT / REPO_ROOT.name
+    if (inner / "src").exists():
+        REPO_ROOT = inner
+
 SRC_DIR = REPO_ROOT / "src"
 CONFIG_FILE = REPO_ROOT / "config" / "config_default.json"
 
-# --- Data files to bundle ---
-# Copy config/config_default.json into the bundle under a "config" directory
 datas = [
     (str(CONFIG_FILE), "config"),
 ]
 
-# --- Hidden imports (for modules that import dynamically) ---
 hiddenimports = collect_submodules("extract_msg")
 
-# --- Analysis ---
 a = Analysis(
-    # Always pass absolute or spec-relative paths as strings
-    [str(SRC_DIR / "app.py")],        # entry point
-    pathex=[str(SRC_DIR)],            # help resolver find your modules in src/
+    [str(SRC_DIR / "app.py")],
+    pathex=[str(SRC_DIR)],
     binaries=[],
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
-    hooksconfig={},                   # PyInstaller 6+ supports hooksconfig
+    hooksconfig={},
     runtime_hooks=[],
     excludes=[],
     noarchive=False,
 )
 
-# --- Python bytecode archive ---
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-# --- One-file, windowed EXE ---
 exe = EXE(
     pyz,
     a.scripts,
     a.binaries,
     a.zipfiles,
     a.datas,
-    [],                                # exclude list for PKG (usually empty)
+    [],
     name="EmailSorter",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=False,                         # set True if UPX is available and desired
+    upx=False,
     upx_exclude=[],
-    runtime_tmpdir=None,               # default temp extraction dir for onefile
-    console=False,                     # windowed (no console)
+    runtime_tmpdir=None,
+    console=False,
     disable_windowed_traceback=False,
-    argv_emulation=False,              # macOS only
+    argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None                          # e.g., str(REPO_ROOT / "build" / "email_sorter.ico")
+    icon=None
 )
