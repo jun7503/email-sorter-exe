@@ -115,4 +115,3 @@ def parse_email_file(path: str):
     if ext == ".msg":
         return parse_msg(path)
     raise ValueError(f"Unsupported file type: {ext}")
-``
