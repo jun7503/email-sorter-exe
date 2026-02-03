@@ -2,36 +2,32 @@
 
 from pathlib import Path
 import sys
-from PyInstaller.utils.hooks import collect_submodules, collect_all
+from PyInstaller.utils.hooks import collect_submodules, collect_all, collect_data_files
+from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
 
 block_cipher = None
 
 # --- Robust path detection regardless of where pyinstaller is invoked ---
 try:
-    # Works when __file__ is defined (most local runs, many CI contexts)
     SPEC_DIR = Path(__file__).resolve().parent
 except NameError:
-    # Fallback: derive from current working directory if __file__ is not set
     SPEC_DIR = Path.cwd() / "build" if (Path.cwd() / "build" / "pyinstaller.spec").exists() else Path.cwd()
 
-# In your repo the spec lives at <repo_root>/build/pyinstaller.spec
-# If SPEC_DIR points to .../build, parent is the repo root.
 REPO_ROOT = SPEC_DIR if SPEC_DIR.name.lower() != "build" else SPEC_DIR.parent
 if not (REPO_ROOT / "src").exists():
-    # Last-ditch fallback for the Actions double-folder checkout pattern
     inner = REPO_ROOT / REPO_ROOT.name
     if (inner / "src").exists():
         REPO_ROOT = inner
 
 SRC_DIR = REPO_ROOT / "src"
 CONFIG_FILE = REPO_ROOT / "config" / "config_default.json"
-HOOKS_DIR = REPO_ROOT / "hooks"   # <— NEW: where hook-email_sorter.py lives
+HOOKS_DIR = REPO_ROOT / "hooks"   # optional; only used if exists
 
-# ✅ Add src/ to sys.path so collect_submodules("email_sorter") works at spec-parse time
+# Ensure src/ is importable at spec-parse time
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-# === DEBUG INFO (keep for now; appears in Actions logs) ===
+# === DEBUG INFO (visible in Actions logs) ===
 print(">> REPO_ROOT:", REPO_ROOT)
 print(">> SRC_DIR:", SRC_DIR)
 _collected_email_sorter = collect_submodules("email_sorter")
@@ -41,14 +37,18 @@ for _m in sorted(_collected_email_sorter):
 # === END DEBUG INFO ===
 
 # ---- Data files bundled next to the exe (inside dist/EmailSorter/) ----
-datas = [(str(CONFIG_FILE), "config")]
+datas = []
+if CONFIG_FILE.exists():
+    datas.append((str(CONFIG_FILE), "config"))
+
 binaries = []
 hiddenimports = set()
 
-# 1) External package submodules (keep)
+# 1) External package submodules
 hiddenimports.update(collect_submodules("extract_msg"))
+hiddenimports.update(["olefile", "chardet"])  # IMPORTANT for .msg
 
-# 2) Collect *everything* from our package (code + data) — very robust
+# 2) Collect code+data from our package
 email_data, email_bins, email_hidden = collect_all("email_sorter")
 datas += email_data
 binaries += email_bins
@@ -57,7 +57,7 @@ hiddenimports.update(email_hidden)
 # 3) Our package as discovered earlier
 hiddenimports.update(_collected_email_sorter)
 
-# 4) Optional: explicit names (belt-and-suspenders)
+# 4) Belt-and-suspenders explicit names
 hiddenimports.update({
     "email_sorter",
     "email_sorter.app",
@@ -75,16 +75,18 @@ hiddenimports.update({
     "email_sorter.topic_map",
 })
 
+# 5) Include data files for extract_msg (defensive)
+datas += collect_data_files("extract_msg")
+
 hiddenimports = list(hiddenimports)
 
-# ⚠️ IMPORTANT: resolve imports ONLY from src/ to avoid path shadowing
 a = Analysis(
-    [str(SRC_DIR / "run_email_sorter.py")],   # entry launcher
-    pathex=[str(SRC_DIR)],                    # ← ONLY src (remove repo root)
+    [str(SRC_DIR / "run_email_sorter.py")],    # entry launcher (your file)
+    pathex=[str(SRC_DIR)],                     # ONLY src
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
-    hookspath=[str(HOOKS_DIR)] if HOOKS_DIR.exists() else [],  # <— NEW
+    hookspath=[str(HOOKS_DIR)] if HOOKS_DIR.exists() else [],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
@@ -107,11 +109,21 @@ exe = EXE(
     upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,    # <— Turn ON for one run to see logs; set False later
+    console=True,     # TEMPORARY: set to False after verifying it works
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
     icon=None
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=False,
+    name="EmailSorter"
 )
