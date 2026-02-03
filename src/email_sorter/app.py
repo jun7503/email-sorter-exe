@@ -11,7 +11,7 @@ from .config_loader import load_config
 
 
 def init_logger():
-    """
+    r"""
     Initialize runtime logging.
     Creates a log file in the user's temp folder:
         C:\Users\<User>\AppData\Local\Temp\EmailSorterLogs\
