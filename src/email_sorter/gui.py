@@ -227,7 +227,7 @@ class EmailSorterWindow(QWidget):
             QMessageBox.critical(self, "Save failed", str(e))
 
         finally:
-               self.progress.setVisible(False)
+            self.progress.setVisible(False)
             self.btn_save_excel.setEnabled(True)
 
     # ------------------------------------------------------------
