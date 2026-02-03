@@ -3,9 +3,9 @@ from collections import defaultdict
 
 def rebuild_summary(wb):
     """
-    Rebuilds the Summary sheet from all topic_<domain> sheets.
+    Rebuild the Summary sheet from all sheets named topic_<domain>.
     Each UpdateGroupKey counts as one 'unique conversation'.
-    We also show latest received date per group.
+    Also display the latest received date per group.
     """
     ws_sum = wb["Summary"]
     ws_sum.delete_rows(1, ws_sum.max_row)
@@ -25,7 +25,7 @@ def rebuild_summary(wb):
         stid, stname, domain, topic_id, subname = row
         topic_name_by_id[int(topic_id)] = (stname, subname)
 
-    # Aggregate across sheets
+    # Aggregate across topic_* sheets
     agg = defaultdict(lambda: {"unique": set(), "total": 0, "latest": {}})
 
     for name in wb.sheetnames:
@@ -45,10 +45,11 @@ def rebuild_summary(wb):
             agg[topic_id]["total"] += 1
 
             last = agg[topic_id]["latest"].get(update_key)
+            # Use string comparison as a fallback when datetime objects are unavailable
             if last is None or str(received) > str(last):
                 agg[topic_id]["latest"][update_key] = received
 
-    # Write back summary
+    # Write the summary rows
     for topic_id, data in agg.items():
         stname, subname = topic_name_by_id.get(topic_id, ("", ""))
         latest_date = max((str(v) for v in data["latest"].values()), default="")
