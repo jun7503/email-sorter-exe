@@ -39,11 +39,12 @@ class EmailSorterWindow(QWidget):
         self.topic_map = TopicMap()
 
         self._build_ui()
-        self._choose_excel_path()
+        self._choose_excel_path()   # ← NOW VALID – method exists
 
+    # ------------------------------------------------------------
+    # UI construction
+    # ------------------------------------------------------------
     def _build_ui(self):
-        v = QVBoxLayout(self)
-        def _build_ui(self):
         v = QVBoxLayout(self)
 
         title = QLabel("Drag & drop .eml / .msg files here")
@@ -55,20 +56,24 @@ class EmailSorterWindow(QWidget):
         v.addWidget(self.path_label)
 
         row = QHBoxLayout()
-        # ... continue your existing UI code ...
+        # Add more UI elements here (buttons, progress bar…)
+        # Example:
+        # self.btn_run = QPushButton("Run")
+        # row.addWidget(self.btn_run)
+        v.addLayout(row)
 
-
-    # ==========================================
-    # ADD THIS METHOD RIGHT BELOW _build_ui()
-    # ==========================================
+    # ------------------------------------------------------------
+    # Excel output path selection
+    # ------------------------------------------------------------
     def _choose_excel_path(self):
         """
-        Ask the user where to save the Excel file.
-        Called inside __init__.
+        Ask the user where to save the Excel output file.
+        Works in both config modes.
         """
 
         mode = (self.cfg.get("excel_path_mode") or "").lower()
 
+        # Ask user every time
         if mode == "ask_each_time":
             path, _ = QFileDialog.getSaveFileName(
                 self,
@@ -76,6 +81,7 @@ class EmailSorterWindow(QWidget):
                 "EmailSorter_Output.xlsx",
                 "Excel Files (*.xlsx)",
             )
+
             if not path:
                 self.excel_path = None
                 self.path_label.setText("Excel: (not chosen)")
@@ -85,28 +91,19 @@ class EmailSorterWindow(QWidget):
             self.path_label.setText(f"Excel: {path}")
             return
 
-        # Fixed path mode
+        # Fixed output path mode
         if mode == "fixed_path":
             fixed = self.cfg.get("excel_output_path")
+
             if fixed:
                 self.excel_path = fixed
                 self.path_label.setText(f"Excel: {fixed}")
                 return
-            else:
-                self.excel_path = None
-                self.path_label.setText("Excel: (fixed path missing)")
-                return
 
-        # Default
+            self.excel_path = None
+            self.path_label.setText("Excel: (fixed path missing)")
+            return
+
+        # Default fallback
         self.excel_path = None
         self.path_label.setText("Excel: (not chosen)")
-        
-        title = QLabel("Drag & drop .eml / .msg files here")
-        title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet("font-size:18px; font-weight:bold;")
-        v.addWidget(title)
-
-        self.path_label = QLabel("Excel: (not chosen)")
-        v.addWidget(self.path_label)
-
-        row = QHBoxLayout()
