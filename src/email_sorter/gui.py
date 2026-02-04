@@ -2,52 +2,41 @@
 from __future__ import annotations
 
 import os
+import logging
 from pathlib import Path
 from typing import List
 
+from PySide6.QtCore import Qt, QUrl
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QProgressBar, QFileDialog,
-    QHBoxLayout, QTextEdit, QMessageBox
+    QHBoxLayout, QMessageBox
 )
-from PySide6.QtCore import Qt
 
-# 🔁 Relative imports inside the package
-from .mail_parser import parse_email_file
-from .text_clean import clean_body_for_semantics, canonical_subject, sender_domain
-from .keys import message_key, thread_key, update_group_key, content_hash
-from .dedup import SimilarityDecider
-from .excel_writer import ExcelStore
-from .summary import rebuild_summary
-from .topic_map import TopicMap
-from .clustering import DomainClusterer
-from .issue_milestone import extract_issue_milestone
+# local modules
 from .version import __version__
+from .processor import process_paths  # <-- use your new pipeline
+
+SUPPORTED_EXTS = {".eml", ".msg"}
 
 
 class EmailSorterWindow(QWidget):
     """
     Main UI window for EmailSorter application.
+    Drag & drop .eml/.msg from **File Explorer** (not directly from Outlook).
     """
 
     def __init__(self, cfg: dict):
         super().__init__()
-        self.cfg = cfg
+        self.cfg = cfg or {}
         self.setWindowTitle(f"📬 EmailSorter v{__version__}")
         self.setMinimumSize(720, 520)
         self.setAcceptDrops(True)
 
-        # Internal state
-        self.sim = SimilarityDecider(cfg)
-        self.clusterer = DomainClusterer(cfg)
-        self.index_keys: set[str] = set()
-        self.topic_map = TopicMap()
-        self.processed_items = []    # collected parsed emails
+        # State
         self.excel_path: str | None = None
 
-        # Build UI
+        # UI
         self._build_ui()
-
-        # Select Excel output location
         self._choose_excel_path()
 
     # ------------------------------------------------------------
@@ -63,30 +52,35 @@ class EmailSorterWindow(QWidget):
 
         # Excel path display
         self.path_label = QLabel("Excel: (not chosen)")
+        self.path_label.setWordWrap(True)
         v.addWidget(self.path_label)
 
+        # Row of actions
         row = QHBoxLayout()
 
-        # Change output path
         self.btn_change_path = QPushButton("Change Excel Path")
         self.btn_change_path.clicked.connect(self._choose_excel_path)
         row.addWidget(self.btn_change_path)
 
-        # Save Excel
         self.btn_save_excel = QPushButton("Save Excel")
         self.btn_save_excel.clicked.connect(self._on_save_excel_clicked)
         row.addWidget(self.btn_save_excel)
 
         v.addLayout(row)
 
-        # Progress bar
+        # Optional: quick picker so you don't have to drag
+        self.btn_add_files = QPushButton("Add files…")
+        self.btn_add_files.clicked.connect(self._pick_files)
+        v.addWidget(self.btn_add_files)
+
+        # Progress bar (used briefly around processing)
         self.progress = QProgressBar()
         self.progress.setRange(0, 0)
         self.progress.setVisible(False)
         v.addWidget(self.progress)
 
     # ------------------------------------------------------------
-    # Drag & drop events (fully fixed)
+    # Drag & drop events (drag from File Explorer)
     # ------------------------------------------------------------
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -95,55 +89,36 @@ class EmailSorterWindow(QWidget):
             event.ignore()
 
     def dropEvent(self, event):
-        from PySide6.QtCore import QUrl
-        import logging
-
-        urls = event.mimeData().urls()
+        urls: List[QUrl] = event.mimeData().urls()
         if not urls:
-            logging.error("DropEvent: No URLs found.")
+            QMessageBox.information(self, "Info", "No items dropped.")
             return
 
-        filepaths = []
-
-        # Convert QUrl to local file paths
-        for url in urls:
-            local_path = url.toLocalFile()
-            if local_path:
-                filepaths.append(local_path)
-                logging.info(f"DropEvent: Received file = {local_path}")
+        filepaths: List[str] = []
+        for u in urls:
+            if u.isLocalFile():
+                p = u.toLocalFile()
+                if os.path.isfile(p) and os.path.splitext(p)[1].lower() in SUPPORTED_EXTS:
+                    filepaths.append(p)
 
         if not filepaths:
-            QMessageBox.warning(self, "No files", "No valid files dropped.")
+            QMessageBox.information(self, "Info", "No supported files (.eml/.msg) found in drop.")
             return
 
-        # Process each file
-        for path in filepaths:
-            ext = os.path.splitext(path)[1].lower()
+        self._process_files(filepaths)
 
-            if ext not in (".eml", ".msg"):
-                logging.warning(f"Skipped non-email file: {path}")
-                continue
-
-            try:
-                rec = parse_email_file(path)
-                logging.info(
-                    f"Parsed successfully: subject={rec.get('Subject')}"
-                )
-                self.processed_items.append(rec)
-
-            except Exception as e:
-                logging.exception(f"Failed parsing file: {path}")
-                QMessageBox.critical(
-                    self,
-                    "Error",
-                    f"Cannot parse:\n{path}\n\n{str(e)}"
-                )
-
-        QMessageBox.information(
+    # ------------------------------------------------------------
+    # File picker
+    # ------------------------------------------------------------
+    def _pick_files(self):
+        files, _ = QFileDialog.getOpenFileNames(
             self,
-            "Done",
-            f"Processed {len(filepaths)} email(s)."
+            "Select .eml/.msg files",
+            "",
+            "Email files (*.eml *.msg);;All files (*.*)"
         )
+        if files:
+            self._process_files(files)
 
     # ------------------------------------------------------------
     # Excel output path selection
@@ -151,7 +126,6 @@ class EmailSorterWindow(QWidget):
     def _choose_excel_path(self):
         mode = (self.cfg.get("excel_path_mode") or "").lower()
 
-        # Ask user every time
         if mode == "ask_each_time":
             path, _ = QFileDialog.getSaveFileName(
                 self,
@@ -163,87 +137,95 @@ class EmailSorterWindow(QWidget):
                 self.excel_path = None
                 self.path_label.setText("Excel: (not chosen)")
                 return
-
-            self.excel_path = path
-            self.path_label.setText(f"Excel: {path}")
+            self._set_excel_path(path)
             return
 
-        # Fixed path mode
         if mode == "fixed_path":
             fixed = (self.cfg.get("excel_output_path") or "").strip()
             if fixed:
-                self.excel_path = fixed
-                self.path_label.setText(f"Excel: {fixed}")
+                self._set_excel_path(fixed)
                 return
-
             self.excel_path = None
             self.path_label.setText("Excel: (fixed path missing)")
             return
 
-        # Default
+        # Default (manual selection on first use)
         self.excel_path = None
         self.path_label.setText("Excel: (not chosen)")
 
+    def _ensure_excel_path(self) -> bool:
+        """Prompt for a path if not yet chosen."""
+        if self.excel_path:
+            return True
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Choose Excel Output File",
+            "EmailSorter_Output.xlsx",
+            "Excel Files (*.xlsx)",
+        )
+        if not path:
+            return False
+        self._set_excel_path(path)
+        return True
+
+    def _set_excel_path(self, path: str):
+        p = Path(path)
+        if p.suffix.lower() != ".xlsx":
+            p = p.with_suffix(".xlsx")
+        p.parent.mkdir(parents=True, exist_ok=True)
+        self.excel_path = str(p)
+        self.path_label.setText(f"Excel: {self.excel_path}")
+
     # ------------------------------------------------------------
-    # Save Excel Handler
+    # Save Excel (confirmation only; pipeline already saves on write)
     # ------------------------------------------------------------
     def _on_save_excel_clicked(self):
+        if not self._ensure_excel_path():
+            return
+        QMessageBox.information(
+            self, "Success",
+            f"Excel saved successfully:\n{self.excel_path}"
+        )
+
+    # ------------------------------------------------------------
+    # Core processing flow
+    # ------------------------------------------------------------
+    def _process_files(self, paths: List[str]):
+        if not self._ensure_excel_path():
+            return
+
+        # Show progress
+        self.progress.setVisible(True)
+        self.btn_add_files.setEnabled(False)
+        self.btn_change_path.setEnabled(False)
+        self.btn_save_excel.setEnabled(False)
+
         try:
-            mode = (self.cfg.get("excel_path_mode") or "").lower()
+            logging.info("Processing %d files -> %s", len(paths), self.excel_path)
+            result = process_paths(paths, self.excel_path)
 
-            if mode == "ask_each_time":
-                path, _ = QFileDialog.getSaveFileName(
-                    self,
-                    "Save Excel As...",
-                    self.excel_path or "EmailSorter_Output.xlsx",
-                    "Excel Files (*.xlsx)",
-                )
-                if not path:
-                    return
-                self.excel_path = path
-
-            if not self.excel_path:
-                self._choose_excel_path()
-                if not self.excel_path:
-                    return
-
-            p = Path(self.excel_path)
-            p.parent.mkdir(parents=True, exist_ok=True)
-
-            # Show progress
-            self.progress.setVisible(True)
-            self.btn_save_excel.setEnabled(False)
-
-            self._save_excel_to(self.excel_path)
-
-            self.path_label.setText(f"Excel: {self.excel_path}")
-            QMessageBox.information(
-                self,
-                "Success",
-                f"Excel saved successfully:\n{self.excel_path}"
+            # Human-readable breakdown
+            msg = (
+                f"Dropped: {result.get('dropped', 0)} file(s)\n"
+                f"Parsed OK: {result.get('parsed', 0)}\n"
+                f"Empty/unsupported skipped: {result.get('empty', 0)}\n"
+                f"Duplicates skipped: {result.get('dedup_skipped', 0)}\n"
+                f"Appended to _Data: {result.get('appended', 0)}\n"
+                f"Index entries added: {result.get('index_added', 0)}"
             )
+            QMessageBox.information(self, "Done", msg)
 
+        except PermissionError:
+            QMessageBox.warning(
+                self, "File Locked",
+                "Excel file appears to be locked by Excel/OneDrive.\n"
+                "Please close it and try again."
+            )
         except Exception as e:
-            QMessageBox.critical(self, "Save failed", str(e))
-
+            logging.exception("Processing failed: %s", e)
+            QMessageBox.critical(self, "Error", str(e))
         finally:
             self.progress.setVisible(False)
+            self.btn_add_files.setEnabled(True)
+            self.btn_change_path.setEnabled(True)
             self.btn_save_excel.setEnabled(True)
-
-    # ------------------------------------------------------------
-    # Excel Writing Logic
-    # ------------------------------------------------------------
-    def _save_excel_to(self, path: str | os.PathLike):
-        rows = self.processed_items
-
-        store = ExcelStore(path)
-        try:
-            if hasattr(store, "write_rows"):
-                store.write_rows("Emails", rows)
-
-            if hasattr(store, "save"):
-                store.save()
-
-        finally:
-            if hasattr(store, "close"):
-                store.close()
