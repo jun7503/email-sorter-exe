@@ -27,7 +27,7 @@ HOOKS_DIR = REPO_ROOT / "hooks"   # optional; only used if exists
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-# === DEBUG INFO (visible in Actions logs) ===
+# === DEBUG INFO ===
 print(">> REPO_ROOT:", REPO_ROOT)
 print(">> SRC_DIR:", SRC_DIR)
 _collected_email_sorter = collect_submodules("email_sorter")
@@ -46,7 +46,14 @@ hiddenimports = set()
 
 # 1) External package submodules
 hiddenimports.update(collect_submodules("extract_msg"))
-hiddenimports.update(["olefile", "chardet"])  # IMPORTANT for .msg
+hiddenimports.update(["olefile", "chardet"])
+
+# >>> ADD: RTF tokenizer used by extract_msg
+try:
+    hiddenimports.update(collect_submodules("rtf_tokenizer"))
+except Exception:
+    # ok if not installed yet; ensure it's in requirements.txt
+    pass
 
 # 2) Collect code+data from our package
 email_data, email_bins, email_hidden = collect_all("email_sorter")
@@ -77,6 +84,15 @@ hiddenimports.update({
 
 # 5) Include data files for extract_msg (defensive)
 datas += collect_data_files("extract_msg")
+
+# >>> ADD: Make sure PySide6 plugins/resources are collected (GUI reliability)
+try:
+    pyside_data, pyside_bins, pyside_hidden = collect_all("PySide6")
+    datas += pyside_data
+    binaries += pyside_bins
+    hiddenimports.update(pyside_hidden)
+except Exception:
+    print(">> Warning: PySide6 not found at spec parse time; skipping collect_all(PySide6)")
 
 hiddenimports = list(hiddenimports)
 
@@ -109,7 +125,7 @@ exe = EXE(
     upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,     # TEMPORARY: set to False after verifying it works
+    console=True,     # keep True for first test; set False after verifying
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
