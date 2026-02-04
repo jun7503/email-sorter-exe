@@ -4,12 +4,13 @@ scipy==1.13.1
 scikit-learn==1.5.2
 pandas==2.2.3
 
+# Excel I/O
 openpyxl==3.1.5
 xlrd==2.0.1
 
 # --- .msg parsing ---
-# pip package name uses a hyphen; import name is extract_msg (underscore).
-# Use a newer version for better RTF/headers handling.
+# pip package name uses a hyphen; import name is extract_msg (underscore)
+# Newer versions handle RTF and headers better
 extract-msg>=0.52.0
 olefile>=0.47
 rtf-tokenizer>=1.0.0
@@ -20,10 +21,5 @@ python-dateutil==2.9.0.post0
 chardet==5.2.0
 loguru==0.7.2
 
-# optional but often useful when dealing with timezones inside .msg
+# Optional: timezone database for Windows (safe to keep)
 tzdata>=2024.1; platform_system == "Windows"
-
-# keep your current versions; only update/append mail parsers
-extract-msg>=0.52.0
-olefile>=0.47
-rtf-tokenizer>=1.0.0
