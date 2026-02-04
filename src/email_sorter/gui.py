@@ -232,4 +232,3 @@ class EmailSorterWindow(QWidget):
             self.btn_add_files.setEnabled(True)
             self.btn_change_path.setEnabled(True)
             self.btn_save_excel.setEnabled(True)
-``
