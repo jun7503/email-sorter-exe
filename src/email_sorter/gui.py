@@ -12,9 +12,9 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QMessageBox
 )
 
-# local modules
+# Local modules
 from .version import __version__
-from .processor import process_paths  # <-- use your new pipeline
+from .processor import process_paths  # <-- pipeline: parse -> dedup -> cluster -> write
 
 SUPPORTED_EXTS = {".eml", ".msg"}
 
@@ -22,7 +22,10 @@ SUPPORTED_EXTS = {".eml", ".msg"}
 class EmailSorterWindow(QWidget):
     """
     Main UI window for EmailSorter application.
-    Drag & drop .eml/.msg from **File Explorer** (not directly from Outlook).
+
+    NOTE:
+      - Drag files from *File Explorer* (not directly from Outlook).
+      - The pipeline writes/updates the Excel workbook on each run.
     """
 
     def __init__(self, cfg: dict):
@@ -55,25 +58,26 @@ class EmailSorterWindow(QWidget):
         self.path_label.setWordWrap(True)
         v.addWidget(self.path_label)
 
-        # Row of actions
         row = QHBoxLayout()
 
+        # Change output path
         self.btn_change_path = QPushButton("Change Excel Path")
         self.btn_change_path.clicked.connect(self._choose_excel_path)
         row.addWidget(self.btn_change_path)
 
+        # Save Excel (confirmation only; pipeline already saves on write)
         self.btn_save_excel = QPushButton("Save Excel")
         self.btn_save_excel.clicked.connect(self._on_save_excel_clicked)
         row.addWidget(self.btn_save_excel)
 
         v.addLayout(row)
 
-        # Optional: quick picker so you don't have to drag
+        # Optional file picker (so you don't have to drag)
         self.btn_add_files = QPushButton("Add files…")
         self.btn_add_files.clicked.connect(self._pick_files)
         v.addWidget(self.btn_add_files)
 
-        # Progress bar (used briefly around processing)
+        # Progress bar
         self.progress = QProgressBar()
         self.progress.setRange(0, 0)
         self.progress.setVisible(False)
@@ -126,6 +130,7 @@ class EmailSorterWindow(QWidget):
     def _choose_excel_path(self):
         mode = (self.cfg.get("excel_path_mode") or "").lower()
 
+        # Ask user every time
         if mode == "ask_each_time":
             path, _ = QFileDialog.getSaveFileName(
                 self,
@@ -140,6 +145,7 @@ class EmailSorterWindow(QWidget):
             self._set_excel_path(path)
             return
 
+        # Fixed path mode
         if mode == "fixed_path":
             fixed = (self.cfg.get("excel_output_path") or "").strip()
             if fixed:
@@ -177,15 +183,12 @@ class EmailSorterWindow(QWidget):
         self.path_label.setText(f"Excel: {self.excel_path}")
 
     # ------------------------------------------------------------
-    # Save Excel (confirmation only; pipeline already saves on write)
+    # Save Excel (confirmation only)
     # ------------------------------------------------------------
     def _on_save_excel_clicked(self):
         if not self._ensure_excel_path():
             return
-        QMessageBox.information(
-            self, "Success",
-            f"Excel saved successfully:\n{self.excel_path}"
-        )
+        QMessageBox.information(self, "Success", f"Excel saved successfully:\n{self.excel_path}")
 
     # ------------------------------------------------------------
     # Core processing flow
@@ -194,7 +197,7 @@ class EmailSorterWindow(QWidget):
         if not self._ensure_excel_path():
             return
 
-        # Show progress
+        # Show progress & disable actions
         self.progress.setVisible(True)
         self.btn_add_files.setEnabled(False)
         self.btn_change_path.setEnabled(False)
@@ -204,7 +207,7 @@ class EmailSorterWindow(QWidget):
             logging.info("Processing %d files -> %s", len(paths), self.excel_path)
             result = process_paths(paths, self.excel_path)
 
-            # Human-readable breakdown
+            # Human-friendly breakdown
             msg = (
                 f"Dropped: {result.get('dropped', 0)} file(s)\n"
                 f"Parsed OK: {result.get('parsed', 0)}\n"
@@ -229,3 +232,4 @@ class EmailSorterWindow(QWidget):
             self.btn_add_files.setEnabled(True)
             self.btn_change_path.setEnabled(True)
             self.btn_save_excel.setEnabled(True)
+``
