@@ -83,6 +83,7 @@ hiddenimports.update({
     "email_sorter.issue_milestone",
     "email_sorter.keys",
     "email_sorter.topic_map",
+    "email_sorter.processor"
 })
 
 # 5) Include data files for extract_msg (defensive)
