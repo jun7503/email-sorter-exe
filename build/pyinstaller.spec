@@ -48,12 +48,15 @@ hiddenimports = set()
 hiddenimports.update(collect_submodules("extract_msg"))
 hiddenimports.update(["olefile", "chardet"])
 
-# >>> ADD: RTF tokenizer used by extract_msg
+# --- Real RTF helpers used by extract-msg ---
 try:
-    hiddenimports.update(collect_submodules("rtf_tokenizer"))
+    hiddenimports.update(collect_submodules("rtfde"))
 except Exception:
-    # ok if not installed yet; ensure it's in requirements.txt
-    pass
+    print(">> Warning: rtfde not installed; continuing")
+try:
+    hiddenimports.update(collect_submodules("compressed_rtf"))
+except Exception:
+    print(">> Warning: compressed_rtf not installed; continuing")
 
 # 2) Collect code+data from our package
 email_data, email_bins, email_hidden = collect_all("email_sorter")
@@ -85,7 +88,7 @@ hiddenimports.update({
 # 5) Include data files for extract_msg (defensive)
 datas += collect_data_files("extract_msg")
 
-# >>> ADD: Make sure PySide6 plugins/resources are collected (GUI reliability)
+# Ensure PySide6 plugins/resources are collected (GUI reliability)
 try:
     pyside_data, pyside_bins, pyside_hidden = collect_all("PySide6")
     datas += pyside_data
