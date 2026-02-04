@@ -9,17 +9,13 @@ openpyxl==3.1.5
 xlrd==2.0.1
 
 # --- .msg parsing ---
-# pip package name uses a hyphen; import name is extract_msg (underscore)
-# Newer versions handle RTF and headers better
+# pip package name uses hyphen; import name is extract_msg (underscore)
 extract-msg>=0.52.0
 olefile>=0.47
-rtf-tokenizer>=1.0.0
-
-# --- UI / utils ---
-PySide6==6.6.3.1
-python-dateutil==2.9.0.post0
-chardet==5.2.0
-loguru==0.7.2
-
-# Optional: timezone database for Windows (safe to keep)
+# RTF helpers actually used with extract-msg
+rtfde>=0.1.0
+compressed-rtf>=1.0.6
+# Optional charset detection (good to keep)
+chardet>=5.0.0
+# Optional: Windows time zone DB
 tzdata>=2024.1; platform_system == "Windows"
