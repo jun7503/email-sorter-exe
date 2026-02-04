@@ -19,3 +19,7 @@ compressed-rtf>=1.0.6
 chardet>=5.0.0
 # Optional: Windows time zone DB
 tzdata>=2024.1; platform_system == "Windows"
+
+# --- GUI (required for PySide6 app) ---
+PySide6==6.6.3.1
+shiboken6==6.6.3.1
