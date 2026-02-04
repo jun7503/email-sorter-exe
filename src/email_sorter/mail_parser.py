@@ -1,13 +1,14 @@
 import os
 import hashlib
 import logging
+from pathlib import Path
+from datetime import datetime
+from html import unescape as html_unescape
+
 import email
 from email import policy
 from email.parser import BytesParser
 from email.utils import parsedate_to_datetime
-from datetime import datetime
-from pathlib import Path
-from html import unescape as html_unescape
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +122,7 @@ def html_to_text(html):
 
     # Remove script/style blocks
     s = re.sub(r"(?is)<(script|style).*?>.*?</\1>", "", s)
-    # Replace <br> and <p> with newlines
+    # Replace <br> and </p> with newlines
     s = re.sub(r"(?i)<br\s*/?>", "\n", s)
     s = re.sub(r"(?i)</p\s*>", "\n", s)
     # Strip all tags
@@ -156,7 +157,7 @@ def _normalize_date_str(date_raw):
     return _safe(date_raw)
 
 # -------------------------
-# MSG
+# MSG (with RTF fallback)
 # -------------------------
 def parse_msg(path: str):
     """Parse an Outlook .msg file and extract metadata and body content."""
@@ -181,14 +182,29 @@ def parse_msg(path: str):
     date_val = getattr(m, "date", None)
     received = _coerce_msg_date(date_val)
 
-    # Body: MSG can be RTF-only; extract_msg usually converts; add fallback
+    # Body: 1) MSG .body; 2) RTF fallback via rtfde; 3) best-effort string fallback
     try:
         body = _coerce_text(getattr(m, "body", None) or "")
     except Exception:
         body = ""
 
     if not body:
-        # best-effort fallback
+        # RTF-only .msg: try rtfde to de-encapsulate RTF into text or HTML
+        try:
+            rtf_bytes = getattr(m, "rtfBody", None) or getattr(m, "rtf", None)
+            if rtf_bytes:
+                from rtfde import RtfString
+                rtf_text = rtf_bytes if isinstance(rtf_bytes, str) else rtf_bytes.decode("utf-8", "ignore")
+                de = RtfString(rtf_text).content
+                if getattr(de, "text", None):
+                    body = _coerce_text(de.text)
+                elif getattr(de, "html", None):
+                    body = html_to_text(_coerce_text(de.html))
+        except Exception as e:
+            logger.warning("RTF fallback failed for %s: %s", path, e)
+
+    if not body:
+        # best-effort final fallback
         try:
             body = _coerce_text(str(m))
         except Exception:
@@ -226,5 +242,5 @@ def _coerce_msg_date(d):
             return d.isoformat(sep=" ")
         except Exception:
             return d.strftime("%Y-%m-%d %H:%M:%S")
-    # Sometimes it's like '2026-02-03 09:12:00+00:00' already
+    # Sometimes it's already a readable string
     return _coerce_text(d)
