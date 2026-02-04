@@ -22,3 +22,8 @@ loguru==0.7.2
 
 # optional but often useful when dealing with timezones inside .msg
 tzdata>=2024.1; platform_system == "Windows"
+
+# keep your current versions; only update/append mail parsers
+extract-msg>=0.52.0
+olefile>=0.47
+rtf-tokenizer>=1.0.0
